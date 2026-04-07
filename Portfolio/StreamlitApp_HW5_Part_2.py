@@ -116,9 +116,9 @@ def display_explanation(input_df, session, aws_bucket):
 
     best_pipeline = load_pipeline(session, aws_bucket, 'sklearn-pipeline-deployment')
     
-    preprocessing_pipeline = Pipeline(steps=best_pipeline.steps[0:2]) # IF YOU ADD STEPS lets say 3 you would have 4 steps instead 3 (ONE LESS THan stesp you have)
+    preprocessing_pipeline = Pipeline(steps=best_pipeline.steps[0:3]) # IF YOU ADD STEPS lets say 3 you would have 4 steps instead 3 (ONE LESS THan stesp you have)
     input_df_transformed = preprocessing_pipeline.transform(input_df) 
-    feature_names = best_pipeline[0:2].get_feature_names_out() # CHANGE HERE AS WELL
+    feature_names = best_pipeline[0:3].get_feature_names_out() # CHANGE HERE AS WELL
     input_df_transformed = pd.DataFrame(input_df_transformed, columns=feature_names) 
     shap_values = explainer(input_df_transformed) 
 
