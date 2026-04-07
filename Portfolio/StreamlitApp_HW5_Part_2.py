@@ -57,8 +57,8 @@ MODEL_INFO = {
         "endpoint": aws_endpoint,
         "explainer": 'explainer_pca.shap', 
         "pipeline": 'finalized_pca_model.tar.gz', 
-        "keys": ["RSI_15","MOM_15"],  #ADJUST YOUR KEYS TO the tOP two
-        "inputs": [{"name": k, "type": "number", "min": -100.0, "max": 100.0, "default": 0.0, "step": 10.0} for k in ["RSI_15","MOM_15"]] #ALSO HEREEE
+        "keys": ["EMA_15","RSI_10"],  #ADJUST YOUR KEYS TO the tOP two
+        "inputs": [{"name": k, "type": "number", "min": -100.0, "max": 100.0, "default": 0.0, "step": 10.0} for k in ["EMA_15","RSI_10"]] #ALSO HEREEE
 }
 
 def load_pipeline(_session, bucket, key):
