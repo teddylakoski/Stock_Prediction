@@ -1,3 +1,4 @@
+gensim==4.4.0
 jupyter-ai[all]
 xgboost
 numpy==1.26.4
