@@ -73,7 +73,7 @@ sm_session = sagemaker.Session(boto_session=session)
 # -------------------------------------------------------------------
 MODEL_INFO = {
     "endpoint":  aws_endpoint,
-    "explainer": "explainer_rf.shap",,
+    "explainer": "explainer_rf.shap",
     "pipeline":  "finalized_logreg_model.tar.gz",
     "s3_prefix": "sklearn-pipeline-deployment",
     # Raw feature names the pipeline expects (the pipeline does its own
