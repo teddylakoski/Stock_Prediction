@@ -1,10 +1,10 @@
 """
 Streamlit web app for my Loan Default Prediction project.
- 
+
 Same structure as the other Streamlit apps we've built: pulls model + explainer
 from S3, calls the SageMaker endpoint, and shows a SHAP waterfall for the
 prediction.
- 
+
 Secrets needed in .streamlit/secrets.toml:
     [aws_credentials]
     AWS_ACCESS_KEY_ID     = "..."
@@ -12,11 +12,11 @@ Secrets needed in .streamlit/secrets.toml:
     AWS_SESSION_TOKEN     = "..."
     AWS_BUCKET            = "teddy-lakoski-s3-bucket"
     AWS_ENDPOINT          = "loan-default-endpoint-v3"
- 
+
 Run with:
     streamlit run streamlit_app.py
 """
- 
+
 import os, sys, warnings
 import numpy as np
 import pandas as pd
@@ -33,25 +33,25 @@ from sagemaker.serializers import JSONSerializer
 from sagemaker.deserializers import JSONDeserializer
 from sklearn.pipeline import Pipeline
 import shap
- 
+
 # -------------------------------------------------------------------
 # Setup
 # -------------------------------------------------------------------
 warnings.simplefilter("ignore")
- 
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '..'))
 if project_root not in sys.path:
     sys.path.append(project_root)
- 
+
 # Access secrets
 aws_id       = st.secrets["aws_credentials"]["AWS_ACCESS_KEY_ID"]
 aws_secret   = st.secrets["aws_credentials"]["AWS_SECRET_ACCESS_KEY"]
 aws_token    = st.secrets["aws_credentials"]["AWS_SESSION_TOKEN"]
 aws_bucket   = st.secrets["aws_credentials"]["AWS_BUCKET"]
 aws_endpoint = st.secrets["aws_credentials"]["AWS_ENDPOINT"]
- 
- 
+
+
 # -------------------------------------------------------------------
 # AWS Session Management
 # -------------------------------------------------------------------
@@ -63,18 +63,18 @@ def get_session(aws_id, aws_secret, aws_token):
         aws_session_token=aws_token,
         region_name='us-east-1'
     )
- 
+
 session    = get_session(aws_id, aws_secret, aws_token)
 sm_session = sagemaker.Session(boto_session=session)
- 
- 
+
+
 # -------------------------------------------------------------------
 # Model & feature configuration
 # -------------------------------------------------------------------
 MODEL_INFO = {
     "endpoint":  aws_endpoint,
-    "explainer": "explainer_loan_default.shap",
-    "pipeline":  "finalized_loan_default_pipeline.tar.gz",
+    "explainer": "explainer_rf.shap",
+    "pipeline":  "finalized_logreg_model.tar.gz",
     "s3_prefix": "sklearn-pipeline-deployment",
     # Raw feature names the pipeline expects (the pipeline does its own
     # feature engineering + one-hot encoding internally)
@@ -102,8 +102,8 @@ MODEL_INFO = {
          "default": "debt_consolidation"},
     ],
 }
- 
- 
+
+
 # -------------------------------------------------------------------
 # Download the pipeline from S3 (only used for local fallback / debugging)
 # -------------------------------------------------------------------
@@ -120,8 +120,8 @@ def load_pipeline(_session, bucket, key):
         tar.extractall(path=".")
         joblib_file = [f for f in tar.getnames() if f.endswith('.joblib')][0]
     return joblib.load(joblib_file)
- 
- 
+
+
 # -------------------------------------------------------------------
 # Download the SHAP explainer from S3
 # -------------------------------------------------------------------
@@ -131,8 +131,8 @@ def load_shap_explainer(_session, bucket, key, local_path):
         s3_client.download_file(Filename=local_path, Bucket=bucket, Key=key)
     with open(local_path, "rb") as f:
         return shap.Explainer.load(f)
- 
- 
+
+
 # -------------------------------------------------------------------
 # Call the live SageMaker endpoint
 # -------------------------------------------------------------------
@@ -151,8 +151,8 @@ def call_model_api(input_df):
         return {"proba": round(proba, 4), "pred": pred}, 200
     except Exception as e:
         return f"Error: {str(e)}", 500
- 
- 
+
+
 # -------------------------------------------------------------------
 # Local SHAP explanation (uses local pipeline preprocessing + downloaded explainer)
 # Wrapped in try/except so a SHAP failure never breaks the prediction itself.
@@ -169,7 +169,7 @@ def display_explanation(input_df, _session, bucket):
     except Exception as e:
         st.warning(f"SHAP explainer could not be loaded (skipping explanation): {e}")
         return
- 
+
     # Step 2: run the pipeline preprocessing on the input row
     try:
         pipeline = load_pipeline(_session, bucket, MODEL_INFO["s3_prefix"])
@@ -179,35 +179,35 @@ def display_explanation(input_df, _session, bucket):
     except Exception as e:
         st.warning(f"Could not run local preprocessing for SHAP: {e}")
         return
- 
+
     # Step 3: compute and render the SHAP waterfall
     try:
         shap_values = explainer(X_pre)
- 
+
         st.subheader("Decision Transparency (SHAP)")
         fig, ax = plt.subplots(figsize=(10, 4))
         shap.plots.waterfall(shap_values[0], max_display=10, show=False)
         st.pyplot(fig)
- 
+
         top_feature = shap_values[0].feature_names[0]
         st.info(f"**Business Insight:** The most influential factor in this decision was **{top_feature}**.")
     except Exception as e:
         st.warning(f"Could not render SHAP plot: {e}")
         return
- 
- 
+
+
 # -------------------------------------------------------------------
 # Streamlit UI
 # -------------------------------------------------------------------
 st.set_page_config(page_title="Loan Default Predictor", layout="wide")
 st.title("Loan Default Predictor")
 st.caption("Teddy Lakoski — Final ML Project")
- 
+
 with st.form("pred_form"):
     st.subheader("Applicant inputs")
     cols = st.columns(2)
     user_inputs = {}
- 
+
     for i, inp in enumerate(MODEL_INFO["inputs"]):
         with cols[i % 2]:
             if inp["type"] == "select":
@@ -221,23 +221,23 @@ with st.form("pred_form"):
                     min_value=inp["min"], max_value=inp["max"],
                     value=inp["default"], step=inp["step"],
                 )
- 
+
     submitted = st.form_submit_button("Run Prediction")
- 
+
 if submitted:
     input_df = pd.DataFrame([user_inputs], columns=MODEL_INFO["keys"])
- 
+
     res, status = call_model_api(input_df)
     if status == 200:
         c1, c2 = st.columns(2)
         c1.metric("Default probability", f"{res['proba']:.1%}")
         c2.metric("Prediction", "Charge-off" if res["pred"] else "Fully paid")
- 
+
         if res["pred"] == 1:
             st.error("The model thinks this applicant is high-risk.")
         else:
             st.success("The model expects this applicant to pay back the loan.")
- 
+
         display_explanation(input_df, session, aws_bucket)
     else:
         st.error(res)
