@@ -11,7 +11,7 @@ Secrets needed in .streamlit/secrets.toml:
     AWS_SECRET_ACCESS_KEY = "..."
     AWS_SESSION_TOKEN     = "..."
     AWS_BUCKET            = "teddy-lakoski-s3-bucket"
-    AWS_ENDPOINT          = "loan-default-endpoint-v1"
+    AWS_ENDPOINT          = "loan-default-endpoint-v3"
  
 Run with:
     streamlit run streamlit_app.py
